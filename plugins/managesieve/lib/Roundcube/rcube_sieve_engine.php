@@ -638,6 +638,9 @@ class rcube_sieve_engine
             $sizeops        = rcube_utils::get_input_value('_rule_size_op', rcube_utils::INPUT_POST);
             $sizeitems      = rcube_utils::get_input_value('_rule_size_item', rcube_utils::INPUT_POST);
             $sizetargets    = rcube_utils::get_input_value('_rule_size_target', rcube_utils::INPUT_POST);
+            $spamtesthumans = rcube_utils::get_input_value('_rule_spamtest_human', rcube_utils::INPUT_POST);
+            $spamtestops    = rcube_utils::get_input_value('_rule_spamtest_op', rcube_utils::INPUT_POST);
+            $spamtestlikelihoods = rcube_utils::get_input_value('_rule_spamtest_likelihood', rcube_utils::INPUT_POST);
             $targets        = rcube_utils::get_input_value('_rule_target', rcube_utils::INPUT_POST, true);
             $mods           = rcube_utils::get_input_value('_rule_mod', rcube_utils::INPUT_POST);
             $mod_types      = rcube_utils::get_input_value('_rule_mod_type', rcube_utils::INPUT_POST);
@@ -726,6 +729,19 @@ class rcube_sieve_engine
                         }
                         else
                             $this->form['tests'][$i]['arg'] .= $m[1];
+                    }
+                    else if (in_array($header, array('spamtest','virustest'))) {
+                        $spamtesthuman = $this->strip_value($spamtesthumans[$idx]);
+                        $spamtestop    = $this->strip_value($spamtestops[$idx]);
+                        $spamtestlikelihood = $this->strip_value($spamtestlikelihoods[$idx]);
+
+                        $this->form['tests'][$i]['test'] = $header;
+                        $this->form['tests'][$i]['type'] = $spamtestop;
+                        $this->form['tests'][$i]['arg']  = $spamtestlikelihood;
+
+                        $this->form['tests'][$i]['human']  = $spamtesthuman;
+                        $this->form['tests'][$i]['op']  = $spamtestop;
+                        $this->form['tests'][$i]['likelihood']  = $spamtestlikelihood;
                     }
                     else if ($header == 'currentdate') {
                         $datepart = $this->strip_value($dateparts[$idx]);
@@ -1556,6 +1572,8 @@ class rcube_sieve_engine
         if (in_array('duplicate', $this->exts)) {
             $select_header->add($this->plugin->gettext('message'), 'message');
         }
+        $select_header->add($this->plugin->gettext('spamtest'), 'spamtest');
+        $select_header->add($this->plugin->gettext('virustest'), 'virustest');
 
         if (isset($rule['test'])) {
             if (in_array($rule['test'], array('header', 'address', 'envelope'))) {
@@ -1574,7 +1592,7 @@ class rcube_sieve_engine
                 $matches = ($header = strtolower($rule['arg'])) && isset($this->headers[$header]);
                 $test    = $matches ? $header : '...';
             }
-            else if (in_array($rule['test'], array('size', 'body', 'date', 'currentdate', 'string'))) {
+            else if (in_array($rule['test'], array('size', 'body', 'date', 'currentdate', 'string', 'spamtest', 'virustest'))) {
                 $test = $rule['test'];
             }
             else if (in_array($rule['test'], array('duplicate'))) {
@@ -1616,7 +1634,7 @@ class rcube_sieve_engine
 
         // matching type select (operator)
         $select_op = new html_select(array('name' => "_rule_op[]", 'id' => 'rule_op'.$id,
-            'style' => 'display:' .(!in_array($rule['test'], array('size', 'duplicate')) ? 'inline' : 'none'),
+            'style' => 'display:' .(!in_array($rule['test'], array('size', 'duplicate', 'spamtest', 'virustest')) ? 'inline' : 'none'),
             'class' => 'operator_selector',
             'onchange' => 'rule_op_select(this, '.$id.')'));
         $select_op->add(rcube::Q($this->plugin->gettext('filtercontains')), 'contains');
@@ -1653,7 +1671,7 @@ class rcube_sieve_engine
         if (in_array($rule['test'], array('header', 'address', 'envelope','string'))) {
             $target = $rule['arg2'];
         }
-        else if (in_array($rule['test'], array('body', 'date', 'currentdate'))) {
+        else if (in_array($rule['test'], array('body', 'date', 'currentdate', 'spamtest', 'virustest'))) {
             $target = $rule['arg'];
         }
         else if ($rule['test'] == 'size') {
@@ -1697,8 +1715,9 @@ class rcube_sieve_engine
         }
 
         $tout .= $select_op->show($test);
+
         $tout .= $this->list_input($id, 'rule_target', $target,
-            $rule['test'] != 'size' && $rule['test'] != 'exists' && $rule['test'] != 'duplicate',
+            !in_array($rule['test'], array('size', 'exists', 'duplicate', 'spamtest', 'virustest')),
             $this->error_class($id, 'test', 'target', 'rule_target')) . "\n";
 
         $select_size_op = new html_select(array('name' => "_rule_size_op[]", 'id' => 'rule_size_op'.$id));
@@ -1724,6 +1743,44 @@ class rcube_sieve_engine
                     'class'   => 'radio',
                 )) . $this->rc->gettext($unit . 'B'));
         }
+        $tout .= '</div>';
+
+        $spamtest_isrule = in_array($rule['test'], array('spamtest','virustest'));
+        $spamtest_display_maybe = $rule['human'] == 'maybe' ? 'inline' : 'none';
+
+        #debugkepi: echo '<pre>';var_dump($rule);var_dump($spamtest_isrule);echo '</pre>';
+
+        $select_spamtest_human = new html_select(array('name' => "_rule_spamtest_human[]", 'id' => 'rule_spamtest_human'.$id,
+                                                       'onchange' => 'rule_spamtest_human(this, '.$id.')'));
+        $select_spamtest_human->add(rcube::Q($this->plugin->gettext('spamtest_not_tested')), 'not_tested');
+        $select_spamtest_human->add(rcube::Q($this->plugin->gettext('spamtest_clear')), 'clear');
+        $select_spamtest_human->add(rcube::Q($this->plugin->gettext('spamtest_maybe')), 'maybe');
+        $select_spamtest_human->add(rcube::Q($this->plugin->gettext('spamtest_spam')), 'spam');
+
+        $select_spamtest_op = new html_select(array('name' => "_rule_spamtest_op[]", 'id' => 'rule_spamtest_op'.$id,
+                                                    'style' => "display: $spamtest_display_maybe"));
+
+        $select_spamtest_op->add(rcube::Q($this->plugin->gettext('valueisgreaterthan')), 'value-gt');
+        $select_spamtest_op->add(rcube::Q($this->plugin->gettext('valueisgreaterthanequal')), 'value-ge');
+        $select_spamtest_op->add(rcube::Q($this->plugin->gettext('valueislessthan')), 'value-lt');
+        $select_spamtest_op->add(rcube::Q($this->plugin->gettext('valueislessthanequal')), 'value-le');
+        $select_spamtest_op->add(rcube::Q($this->plugin->gettext('valueequals')), 'value-eq');
+        $select_spamtest_op->add(rcube::Q($this->plugin->gettext('valuenotequals')), 'value-ne');
+
+        $select_spamtest_likelihood = new html_select(array('name' => "_rule_spamtest_likelihood[]", 'id' => 'rule_spamtest_likelihood'.$id,
+                                                       'style' => "display: $spamtest_display_maybe"));
+
+        for ($i=9; $i>1; $i--) {
+            $select_spamtest_likelihood->add($i . '0 % ', "$i");
+        }
+
+        $tout .= '<div id="rule_spamtest' .$id. '" style="display:' . (in_array($rule['test'], array('spamtest','virusttest')) ? 'inline' : 'none') .'">';
+        $tout .= $select_spamtest_human->show($spamtest_isrule ? $rule['human'] : null);
+
+        $tout .= $select_spamtest_op->show($spamtest_isrule ? $rule['type'] : null);
+
+        $tout .= $select_spamtest_likelihood->show($spamtest_isrule ? $rule['arg'] : null);
+
         $tout .= '</div>';
 
         // Advanced modifiers (address, envelope)
@@ -1919,7 +1976,7 @@ class rcube_sieve_engine
         $set = array('header', 'address', 'envelope', 'body', 'date', 'currentdate', 'string');
 
         // build test string supported by select element
-        if ($rule['size']) {
+        if ($rule['size'] || in_array($rule['test'], array('spamtest','virustest'))) {
             $test = $rule['type'];
         }
         else if (in_array($rule['test'], $set)) {

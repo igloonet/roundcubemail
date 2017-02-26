@@ -638,6 +638,7 @@ function rule_header_select(id)
   var obj = document.getElementById('header' + id),
     size = document.getElementById('rule_size' + id),
     msg = document.getElementById('rule_message' + id),
+    spamtest = document.getElementById('rule_spamtest' + id),
     op = document.getElementById('rule_op' + id),
     header = document.getElementById('custom_header' + id + '_list'),
     custstr = document.getElementById('custom_var' + id + '_list'),
@@ -648,7 +649,7 @@ function rule_header_select(id)
     dateheader = document.getElementById('rule_date_header_div' + id),
     rule = $('#rule_op' + id),
     h = obj.value,
-    set = [op, header, custstr, mod, trans, comp, size];
+    set = [op, header, custstr, mod, trans, comp, size, spamtest];
 
   if (h == 'size') {
     if (msg) set.push(msg);
@@ -659,10 +660,15 @@ function rule_header_select(id)
     $.each(set, function() { this.style.display = 'none'; });
     msg.style.display = 'inline';
   }
+  else if (h == 'spamtest' || h == 'virustest' ) {
+    $.each(set, function() { this.style.display = 'none'; });
+    spamtest.style.display = 'inline';
+  }
   else {
     header.style.display = h != '...' ? 'none' : 'inline-block';
     custstr.style.display = h != 'string' ? 'none' : 'inline-block';
     size.style.display = 'none';
+    spamtest.style.display = 'none';
     op.style.display = 'inline';
     comp.style.display = '';
     mod.style.display = h == 'body' || h == 'currentdate' || h == 'date' || h == 'string' ? 'none' : 'block';
@@ -693,7 +699,22 @@ function rule_op_select(obj, id, header)
   if (!header)
     header = document.getElementById('header' + id).value;
 
-  target.style.display = obj.value.match(/^(exists|notexists)$/) || header.match(/^(size|message)$/) ? 'none' : 'inline-block';
+  target.style.display = obj.value.match(/^(exists|notexists)$/) || header.match(/^(size|message|spamtest|virustest)$/) ? 'none' : 'inline-block';
+};
+
+function rule_spamtest_human(obj, id, header)
+{
+  var target1 = document.getElementById('rule_spamtest_likelihood' + id);
+  var target2 = document.getElementById('rule_spamtest_op' + id);
+
+  if ( obj.value === 'maybe' ) {
+    target1.style.display = 'inline-block';
+    target2.style.display = 'inline-block';
+  }
+  else {
+    target1.style.display = 'none';
+    target2.style.display = 'none';
+  }
 };
 
 function rule_trans_select(id)
@@ -717,7 +738,7 @@ function rule_mod_select(id, header)
   target.style.display = obj.value != 'address' && obj.value != 'envelope' ? 'none' : 'inline';
 
   if (index)
-    index.style.display = !header.match(/^(body|currentdate|size|message|string)$/) && obj.value != 'envelope'  ? '' : 'none';
+    index.style.display = !header.match(/^(body|currentdate|size|message|string|spamtest|virustest)$/) && obj.value != 'envelope'  ? '' : 'none';
 
   if (duplicate)
     duplicate.style.display = header == 'message' ? '' : 'none';

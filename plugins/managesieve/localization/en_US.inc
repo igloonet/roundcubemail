@@ -201,6 +201,12 @@ $labels['duplicate.header'] = 'header:';
 $labels['duplicate.uniqueid'] = 'identifier:';
 $labels['duplicate.seconds'] = 'timeout (seconds):';
 $labels['duplicate.last'] = 'relative to the last execution';
+$labels['spamtest'] = 'Spam Probablity';
+$labels['virustest'] = 'Virus Probablity';
+$labels['spamtest_not_tested'] = 'Not tested';
+$labels['spamtest_clear'] = 'Clear of SPAM';
+$labels['spamtest_maybe'] = 'Maybe SPAM';
+$labels['spamtest_spam'] = 'Definitely SPAM';
 
 $messages = array();
 $messages['filterunknownerror'] = 'Unknown server error.';

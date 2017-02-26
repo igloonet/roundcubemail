@@ -47,7 +47,8 @@ class rcube_sieve_script
         'vacation',                 // RFC5230
         'vacation-seconds',         // RFC6131
         'variables',                // RFC5229
-        // @TODO: spamtest+virustest, mailbox
+        'spamtest',                 // RFC5235
+        'virustest',                // RFC5235
     );
 
     /**
@@ -280,6 +281,38 @@ class rcube_sieve_script
 
                         $tests[$i] .= ' ' . self::escape_string($test['arg1']);
                         $tests[$i] .= ' ' . self::escape_string($test['arg2']);
+                        break;
+
+                    case 'spamtest':
+                    case 'virustest':
+                        array_push($exts, 'spamtestplus');
+
+                        # prepare data for our selects
+                        switch($test['human']) {
+                        case 'not_tested':
+                            $test['type'] = 'value-eq';
+                            $test['arg']  = 0;
+                            break;
+                        case 'clear':
+                            $test['type'] = 'value-eq';
+                            $test['arg']  = 1;
+                            break;
+                        case 'spam':
+                            $test['type'] = 'value-eq';
+                            $test['arg']  = 10;
+                            break;
+                        }
+                        #debugkepi:                        echo '<pre>';var_dump($test);#exit;
+
+                        $tests[$i] .= ($test['not'] ? 'not ' : '');
+                        $tests[$i] .= $test['test'];
+
+                        list($what, $operator) = preg_split('/-/', $test['type']);
+
+                        $this->add_operator($test, $tests[$i], $exts);
+
+                        $tests[$i] .= ' '. self::escape_string($test['arg']);
+
                         break;
 
                     case 'body':
@@ -732,6 +765,33 @@ class rcube_sieve_script
                         }
                     }
                 }
+
+                $tests[] = $test;
+                break;
+
+            case 'spamtest':
+            case 'virustest':
+                $test = array('test' => $token, 'not' => $not);
+
+                $test['arg'] = array_pop($tokens);
+
+                # prepare data for our selects
+                switch($test['arg']) {
+                case 0:
+                    $test['human'] = 'not_tested';
+                    break;
+                case 1:
+                    $test['human'] = 'clear';
+                    break;
+                case 10:
+                    $test['human'] = 'spam';
+                    break;
+                default:
+                    $test['human'] = 'maybe';
+                    break;
+                }
+
+                $test += $this->test_tokens($tokens);
 
                 $tests[] = $test;
                 break;
